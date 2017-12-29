@@ -813,6 +813,11 @@ UsbTabletOpen(InputInfoPtr pInfo)
 	comm->factorY = ((double) screenInfo.screens[0]->height)
 		/ (comm->yMax - comm->yMin);
 
+	if ( comm->factorX < comm->factorY )
+		comm->factorX = comm->factorY*comm->factorY/comm->factorX;
+	 else
+		comm->factorY = comm->factorX*comm->factorX/comm->factorY;
+
 	xf86Msg(X_PROBED, "USBT tablet X=%d..%d, Y=%d..%d\n",
 		    comm->xMin,
 		    comm->xMax,
@@ -833,6 +838,7 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 	USBTDevicePtr priv = (USBTDevicePtr)pInfo->private;
 	USBTCommonPtr comm = priv->comm;
 	int i;
+	double factorX,factorY;
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 	Atom axes_labels[NAXES] = {0};
 #endif
@@ -864,13 +870,17 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 
 	/* Set the real values */
 	/* XXX scaling done here, since Xorg 7.3 does not call UsbTabletConvert */
+	factorX = ((double) screenInfo.screens[0]->width)
+		/ (comm->xMax - comm->xMin);
+	factorY = ((double) screenInfo.screens[0]->height)
+		/ (comm->yMax - comm->yMin);
 	InitValuatorAxisStruct(pUSBT,
 			       0,
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 			       axes_labels[0],
 #endif
-			       comm->xMin * comm->factorX, /* min val */
-			       comm->xMax * comm->factorX, /* max val */
+			       comm->xMin * factorX, /* min val */
+			       comm->xMax * factorX, /* max val */
 			       mils(1000), /* resolution */
 			       0, /* min_res */
 			       mils(1000) /* max_res */
@@ -883,8 +893,8 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 			       axes_labels[1],
 #endif
-			       comm->yMin * comm->factorY, /* min val */
-			       comm->yMax * comm->factorY, /* max val */
+			       comm->yMin * factorY , /* min val */
+			       comm->yMax * factorY , /* max val */
 			       mils(1000), /* resolution */
 			       0, /* min_res */
 			       mils(1000) /* max_res */
