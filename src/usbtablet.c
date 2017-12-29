@@ -48,7 +48,6 @@
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbhid.h>
-#include <dev/hid/hid.h>
 
 #include <xorg-server.h>
 #include <misc.h>
