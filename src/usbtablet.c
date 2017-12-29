@@ -34,10 +34,14 @@
  *   Wacom Graphire2 ET-0405A-U
  *   Wacom Intuos2 A4 XD-0912-U
  *   Wacom Intuos Art CTH-690/K0
- * Does not work for:
- *   Wacom Graphire3 4x5 (do not overwrite its report descriptor)
- *   Wacom Graphire3 6x8 (do not overwrite its report descriptor)
- *   Wacom Graphire4 4x5 (do not overwrite its report descriptor)
+ * Works with a kernel patch for:
+ *   Wacom Graphire3 4x5 
+ *   Wacom Graphire3 6x8
+ *   Wacom Graphire4 4x5
+ *   Wacom Bamboo Fan medium CTE-650
+ *   Wacom Bamboo Pen CTL-470
+ *   Wacom Bamboo Pen and Touch medium CTH-670
+ *   Wacom Intuos Pen and Touch small CTH-480
  */
 #ifdef HAVE_CONFIG_H
 #include "config.h"
@@ -369,14 +373,39 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 			switch (comm->idProduct) {
 			case 0x0010: /* Graphire ET-0405-U */
 			case 0x0011: /* Graphire2 ET-0405A-U */
+			case 0x0013: /* Graphire3 4x5 CTE-430 */
+			case 0x0014: /* Graphire3 6x8 CTE-630 */
+			case 0x0015: /* Graphire4 4x5 CTE-440 */
+			case 0x0018: /* Bamboo Fan medium CTE-650 */
 				ds.x = hidData[2] << 8;
 				ds.x |= hidData[1];
 				ds.y = hidData[4] << 8;
 				ds.y |= hidData[3];
 				ds.buttons = hidData[0] & 0x07;
 				invert = (hidData[0] >> 5) & 0x01;
-				ds.pressure = hidData[5];
+				ds.pressure = (hidData[6] ) << 8 ;
+				ds.pressure |= hidData[5];
 				ds.proximity = (hidData[0] >> 7) & 0x01;
+				ds.xTilt = -1;
+				ds.yTilt = -1;
+				break;
+			case 0x00dd: /* Bamboo Pen CTL-470/K */
+			case 0x00df: /* Bamboo Pen and Touch CTH-670/K */
+			case 0x0302: /* Intuos Pen and Touch small CTH-480 */
+				ds.x = hidData[2] << 8;
+				ds.x |= hidData[1];
+				ds.y = hidData[4] << 8;
+				ds.y |= hidData[3];
+				ds.buttons = hidData[0] & 0x07;
+				invert = (hidData[0] >> 3) & 0x01;
+				ds.pressure = (hidData[6] ) << 8 ;
+				ds.pressure |= hidData[5];
+				ds.distance = hidData[7];
+				ds.distance = hidData[8] >> 3;
+				if (ds.distance > 14)
+					ds.proximity = 1;
+				else
+					ds.proximity = 0;
 				ds.xTilt = -1;
 				ds.yTilt = -1;
 				break;
@@ -690,10 +719,30 @@ UsbTabletOpen(InputInfoPtr pInfo)
 		switch (comm->idProduct) {
 		case 0x0010: /* Graphire ET-0405-U */
 		case 0x0011: /* Graphire2 ET-0405A-U */
+		case 0x0013: /* Graphire3 4x5 CTE-430 */
+		case 0x0015: /* Graphire4 4x5 CTE-440 */
 			comm->xMin = 0;
-			comm->xMax = 10206;
+			comm->xMax = 10204;	/* XXX: 10206? */
 			comm->yMin = 0;
 			comm->yMax = 7422;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 511;
+			comm->nAxes = 3;
+			break;
+		case 0x0014: /* Graphire3 6x8 CTE-630 */
+			comm->xMin = 0;
+			comm->xMax = 16704;
+			comm->yMin = 0;
+			comm->yMax = 12064;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 511;
+			comm->nAxes = 3;
+			break;
+		case 0x0018: /* Bamboo Fan medium CTE-650 */
+			comm->xMin = 0;
+			comm->xMax = 21648;
+			comm->yMin = 0;
+			comm->yMax = 13530;
 			comm->tipPressureMin = 0;
 			comm->tipPressureMax = 511;
 			comm->nAxes = 3;
@@ -708,6 +757,39 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->distanceMin = 0;
 			comm->distanceMax = 31;
 			comm->nAxes = 5;
+			break;
+		case 0x00dd: /* Bamboo Pen CTL-470/K */
+			comm->xMin = 0;
+			comm->xMax = 14720;
+			comm->yMin = 0;
+			comm->yMax = 9200;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 1023;
+			comm->distanceMin = 0;
+			comm->distanceMax = 43;
+			comm->nAxes = 3;
+			break;
+		case 0x00df: /* Bamboo Pen and Touch medium CTH-670/K */
+			comm->xMin = 0;
+			comm->xMax = 21648;
+			comm->yMin = 0;
+			comm->yMax = 13700;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 1023;
+			comm->distanceMin = 0;
+			comm->distanceMax = 43;
+			comm->nAxes = 3;
+			break;
+		case 0x0302: /* Intuos Pen and Touch small CTH-480 */
+			comm->xMin = 0;
+			comm->xMax = 15200;
+			comm->yMin = 0;
+			comm->yMax = 9600;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 1023;
+			comm->distanceMin = 0;
+			comm->distanceMax = 43;
+			comm->nAxes = 3;
 			break;
 		case 0x033e: /* Intuos Art CTH-690/K0 */
 			comm->xMin = 0;
