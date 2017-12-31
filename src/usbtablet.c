@@ -401,7 +401,6 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				ds.pressure = (hidData[6] ) << 8 ;
 				ds.pressure |= hidData[5];
 				ds.distance = hidData[7];
-				ds.distance = hidData[8] >> 3;
 				if (ds.distance > 14)
 					ds.proximity = 1;
 				else
