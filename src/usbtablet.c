@@ -815,9 +815,9 @@ UsbTabletOpen(InputInfoPtr pInfo)
 		/ (comm->yMax - comm->yMin);
 
 	if ( comm->factorX < comm->factorY )
-		comm->factorX = comm->factorY*comm->factorY/comm->factorX;
+		comm->factorX = comm->factorY;
 	else
-		comm->factorY = comm->factorX*comm->factorX/comm->factorY;
+		comm->factorY = comm->factorX;
 
 	xf86Msg(X_PROBED, "USBT tablet X=%d..%d, Y=%d..%d\n",
 		    comm->xMin,
