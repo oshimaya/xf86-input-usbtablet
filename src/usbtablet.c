@@ -104,6 +104,8 @@ typedef struct {
 	InputInfoPtr	*devices;
 	double		factorX;
 	double		factorY;
+	int		offsetX;
+	int		offsetY;
 	hid_item_t	hidData[NPKT];
 	int		reportSize;
 	int		reportId;
@@ -608,11 +610,11 @@ UsbTabletSendEvents(InputInfoPtr pInfo, int invert, USBTState *ds, int nAxes)
 		switch (nAxes) {
 		case 3:
 			xf86PostMotionEvent(pInfo->dev, is_abs, 0, nAxes,
-				rx, ry, rz);
+				rx - comm->offsetX, ry-comm->offsetY, rz);
 			break;
 		case 5:
 			xf86PostMotionEvent(pInfo->dev, is_abs, 0, nAxes,
-				rx, ry, rz, rtx, rty);
+				rx - comm->offsetX, ry-comm->offsetY, rz, rtx, rty);
 			break;
 		default:
 			break;
@@ -814,7 +816,7 @@ UsbTabletOpen(InputInfoPtr pInfo)
 
 	if ( comm->factorX < comm->factorY )
 		comm->factorX = comm->factorY*comm->factorY/comm->factorX;
-	 else
+	else
 		comm->factorY = comm->factorX*comm->factorX/comm->factorY;
 
 	xf86Msg(X_PROBED, "USBT tablet X=%d..%d, Y=%d..%d\n",
@@ -873,6 +875,11 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 		/ (comm->xMax - comm->xMin);
 	factorY = ((double) screenInfo.screens[0]->height)
 		/ (comm->yMax - comm->yMin);
+	comm->offsetX = ((double)(comm->xMax - comm->xMin) *
+				 (comm->factorX - factorX)/2);
+	comm->offsetY = ((double)(comm->yMax - comm->yMin) *
+				 (comm->factorY - factorY)/2);
+	xf86Msg(X_PROBED, "area offset = %d, %d\n", comm->offsetX, comm->offsetY);
 	InitValuatorAxisStruct(pUSBT,
 			       0,
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
