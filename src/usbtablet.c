@@ -785,7 +785,7 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->xMin = 0;
 			comm->xMax = 15200;
 			comm->yMin = 0;
-			comm->yMax = 9600;
+			comm->yMax = 9500;
 			comm->tipPressureMin = 0;
 			comm->tipPressureMax = 1023;
 			comm->distanceMin = 0;
