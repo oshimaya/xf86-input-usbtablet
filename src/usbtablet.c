@@ -622,7 +622,7 @@ UsbTabletSendEvents(InputInfoPtr pInfo, int invert, USBTState *ds, int nAxes)
 	}
 	if (ds->buttons != ods->buttons)
 		UsbTabletSendButtons(pInfo, ds->buttons,
-				   rx, ry, rz, rtx, rty);
+				   rx - comm->offsetX, ry - comm->offsetY, rz, rtx, rty);
 	*ods = *ds;
 }
 
