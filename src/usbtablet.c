@@ -90,6 +90,7 @@
 #define ERASER_ID	2	    /* local id */
 
 #define ABSOLUTE_FLAG	0x10000
+#define ASPECT_FLAG	0x20000
 
 #define NBUTTONS 4
 #define NAXES 5	/* X, Y, Pressure, Tilt-X, Tilt-Y */
@@ -814,10 +815,12 @@ UsbTabletOpen(InputInfoPtr pInfo)
 	comm->factorY = ((double) screenInfo.screens[0]->height)
 		/ (comm->yMax - comm->yMin);
 
-	if ( comm->factorX < comm->factorY )
-		comm->factorX = comm->factorY;
-	else
-		comm->factorY = comm->factorX;
+	if ( priv->flags & ASPECT_FLAG ) {
+		if ( comm->factorX < comm->factorY )
+			comm->factorX = comm->factorY;
+		else
+			comm->factorY = comm->factorX;
+	}
 
 	xf86Msg(X_PROBED, "USBT tablet X=%d..%d, Y=%d..%d\n",
 		    comm->xMin,
@@ -871,14 +874,21 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 
 	/* Set the real values */
 	/* XXX scaling done here, since Xorg 7.3 does not call UsbTabletConvert */
-	factorX = ((double) screenInfo.screens[0]->width)
-		/ (comm->xMax - comm->xMin);
-	factorY = ((double) screenInfo.screens[0]->height)
-		/ (comm->yMax - comm->yMin);
-	comm->offsetX = ((double)(comm->xMax - comm->xMin) *
-				 (comm->factorX - factorX)/2);
-	comm->offsetY = ((double)(comm->yMax - comm->yMin) *
-				 (comm->factorY - factorY)/2);
+	if ( priv->flags & ASPECT_FLAG ) {
+		factorX = ((double) screenInfo.screens[0]->width)
+			/ (comm->xMax - comm->xMin);
+		factorY = ((double) screenInfo.screens[0]->height)
+			/ (comm->yMax - comm->yMin);
+		comm->offsetX = ((double)(comm->xMax - comm->xMin) *
+					 (comm->factorX - factorX)/2);
+		comm->offsetY = ((double)(comm->yMax - comm->yMin) *
+					 (comm->factorY - factorY)/2);
+	} else {
+		factorX = comm->factorX;
+		factorY = comm->factorY;
+		comm->offsetX = 0;
+		comm->offsetY = 0;
+	}
 	xf86Msg(X_PROBED, "area offset = %d, %d\n", comm->offsetX, comm->offsetY);
 	InitValuatorAxisStruct(pUSBT,
 			       0,
@@ -1124,6 +1134,12 @@ UsbTabletPreInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 	xf86Msg(X_CONFIG, "%s is in %s mode\n", pInfo->name,
 		(priv->flags & ABSOLUTE_FLAG) ? "absolute" : "relative");
 
+	if (xf86CheckBoolOption(pInfo->options, "KeepAspect", TRUE))
+		priv->flags |= ASPECT_FLAG;
+	else
+		priv->flags &= ~ASPECT_FLAG;
+	xf86Msg(X_CONFIG, "%s is %s \n", pInfo->name,
+		(priv->flags & ASPECT_FLAG) ? "true" : "false");
 
 	i = xf86SetIntOption(pInfo->options, "ThreshHold", -1);
 	if (i != -1) {
