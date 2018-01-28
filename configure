@@ -17572,7 +17572,7 @@ if test -n "$XORG_CFLAGS"; then
   ac_status=$?
   $as_echo "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
   test $ac_status = 0; }; then
-  pkg_cv_XORG_CFLAGS=`$PKG_CONFIG --cflags "xorg-server xproto inputproto" 2>/dev/null`
+  pkg_cv_XORG_CFLAGS=`$PKG_CONFIG --cflags "xorg-server xproto inputproto pixman-1" 2>/dev/null`
 		      test "x$?" != "x0" && pkg_failed=yes
 else
   pkg_failed=yes
