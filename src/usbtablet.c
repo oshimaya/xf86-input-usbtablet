@@ -91,6 +91,7 @@
 
 #define ABSOLUTE_FLAG	0x10000
 #define ASPECT_FLAG	0x20000
+#define OFFSET_FLAG	0x40000
 
 #define NBUTTONS 4
 #define NAXES 5	/* X, Y, Pressure, Tilt-X, Tilt-Y */
@@ -879,10 +880,15 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 			/ (comm->xMax - comm->xMin);
 		factorY = ((double) screenInfo.screens[0]->height)
 			/ (comm->yMax - comm->yMin);
-		comm->offsetX = ((double)(comm->xMax - comm->xMin) *
+		if ( priv->flags & OFFSET_FLAG ) {
+			comm->offsetX = ((double)(comm->xMax - comm->xMin) *
 					 (comm->factorX - factorX)/2);
-		comm->offsetY = ((double)(comm->yMax - comm->yMin) *
+			comm->offsetY = ((double)(comm->yMax - comm->yMin) *
 					 (comm->factorY - factorY)/2);
+		} else {
+			comm->offsetX = 0;
+			comm->offsetY = 0;
+		}
 	} else {
 		factorX = comm->factorX;
 		factorY = comm->factorY;
@@ -1138,8 +1144,15 @@ UsbTabletPreInit(InputDriverPtr drv, InputInfoPtr pInfo, int flags)
 		priv->flags |= ASPECT_FLAG;
 	else
 		priv->flags &= ~ASPECT_FLAG;
-	xf86Msg(X_CONFIG, "%s is %s \n", pInfo->name,
+	xf86Msg(X_CONFIG, "%s keep screen-aspect is %s \n", pInfo->name,
 		(priv->flags & ASPECT_FLAG) ? "true" : "false");
+
+	if (xf86CheckBoolOption(pInfo->options, "AutoOffset", TRUE))
+		priv->flags |= OFFSET_FLAG;
+	else
+		priv->flags &= ~OFFSET_FLAG;
+	xf86Msg(X_CONFIG, "%s auto offset is %s \n", pInfo->name,
+		(priv->flags & OFFSET_FLAG) ? "true" : "false");
 
 	i = xf86SetIntOption(pInfo->options, "ThreshHold", -1);
 	if (i != -1) {
