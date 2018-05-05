@@ -96,7 +96,7 @@
 #define NBUTTONS 4
 #define NAXES 5	/* X, Y, Pressure, Tilt-X, Tilt-Y */
 
-#define NPKT 10 /* for Intuos2 and Intuos Art */
+#define NPKT 26 /* for Intuos BT */
 
 typedef struct USBTDevice USBTDevice, *USBTDevicePtr;
 
@@ -369,7 +369,8 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 		}
 
 		for (i = 0; i < NPKT; i++) {
-			hidData[i] = hid_get_data(p, &comm->hidData[i]) & 0xff;
+//			hidData[i] = hid_get_data(p, &comm->hidData[i]) & 0xff;
+			hidData[i] = *(p+i);
 		}
 
 		if (comm->idVendor == 0x056a) {
@@ -396,6 +397,7 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 			case 0x00dd: /* Bamboo Pen CTL-470/K */
 			case 0x00df: /* Bamboo Pen and Touch CTH-670/K */
 			case 0x0302: /* Intuos Pen and Touch small CTH-480 */
+			case 0x0303: /* Intuos Pen and Touch small CTH-480 */
 				ds.x = hidData[2] << 8;
 				ds.x |= hidData[1];
 				ds.y = hidData[4] << 8;
@@ -453,6 +455,23 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				ds.pressure |= (hidData[6] & 0xc0) >> 5;
 				ds.pressure |= hidData[0] & 0x01;
 				ds.proximity = 1;
+				ds.xTilt = -1;
+				ds.yTilt = -1;
+				break;
+			case 0x0378: /* Intuos BT M CTL-6100WL */
+				ds.x = hidData[2] << 8;
+				ds.x |= hidData[1];
+				ds.y = hidData[5] << 8;
+				ds.y |= hidData[4];
+				ds.buttons = hidData[0] & 0x07;
+				ds.pressure = (hidData[8] ) << 8;
+				ds.pressure |= hidData[7];
+				ds.distance = hidData[15];
+//				if (ds.distance > 24)
+					ds.proximity = 1;
+//				else
+//					ds.proximity = 0;
+				invert = 0;
 				ds.xTilt = -1;
 				ds.yTilt = -1;
 				break;
@@ -696,6 +715,7 @@ UsbTabletOpen(InputInfoPtr pInfo)
 	DBG(1, ErrorF("initializing tablet\n"));
 
 	rd = hid_get_report_desc(pInfo->fd);
+	DBG(1, ErrorF("hid_get_report_desc\n"));
 	if (rd == 0) {
 		ErrorF(comm->devName);
 		SYSCALL(close(pInfo->fd));
@@ -794,6 +814,17 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->distanceMax = 43;
 			comm->nAxes = 3;
 			break;
+		case 0x0303: /* Intuos Pen and Touch medium CTH-680 */
+			comm->xMin = 0;
+			comm->xMax = 21600;
+			comm->yMin = 0;
+			comm->yMax = 13500;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 1023;
+			comm->distanceMin = 0;
+			comm->distanceMax = 43;
+			comm->nAxes = 3;
+			break;
 		case 0x033e: /* Intuos Art CTH-690/K0 */
 			comm->xMin = 0;
 			comm->xMax = 21600;
@@ -805,7 +836,19 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->distanceMax = 63;
 			comm->nAxes = 3;
 			break;
+		case 0x0378: /* Intuos BT M CTL-6100WL */
+			comm->xMin = 0;
+			comm->xMax = 21600;
+			comm->yMin = 0;
+			comm->yMax = 13500;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 4095;
+			comm->distanceMin = 0;
+			comm->distanceMax = 63;
+			comm->nAxes = 3;
+			break;
 		default:
+	DBG(1, ErrorF("not match\n"));
 			return !Success;
 		}
 	} else {
