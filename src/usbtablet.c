@@ -396,8 +396,8 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				break;
 			case 0x00dd: /* Bamboo Pen CTL-470/K */
 			case 0x00df: /* Bamboo Pen and Touch CTH-670/K */
-			case 0x0302: /* Intuos Pen and Touch small CTH-480 */
-			case 0x0303: /* Intuos Pen and Touch small CTH-480 */
+			case 0x0302: /* Intuos PTS CTH-480 */
+			case 0x0303: /* Intuos PTS CTH-680 */
 				ds.x = hidData[2] << 8;
 				ds.x |= hidData[1];
 				ds.y = hidData[4] << 8;
@@ -407,7 +407,7 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				ds.pressure = (hidData[6] ) << 8 ;
 				ds.pressure |= hidData[5];
 				ds.distance = hidData[7];
-				if (ds.distance > 14)
+				if (ds.distance < 50)
 					ds.proximity = 1;
 				else
 					ds.proximity = 0;
@@ -446,7 +446,7 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				ds.y |= hidData[8] & 0x01;
 				invert = 0;
 				ds.distance = hidData[8] >> 2;
-				if (ds.distance > 50)
+				if (ds.distance < 50)
 					ds.proximity = 1;
 				else
 					ds.proximity = 0;
@@ -454,23 +454,29 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				ds.pressure = hidData[5] << 3;
 				ds.pressure |= (hidData[6] & 0xc0) >> 5;
 				ds.pressure |= hidData[0] & 0x01;
-				ds.proximity = 1;
 				ds.xTilt = -1;
 				ds.yTilt = -1;
 				break;
+			case 0x0374: /* Intuos S CTL-4100 */
+			case 0x0376: /* Intuos BT S CTL-4100WL */
 			case 0x0378: /* Intuos BT M CTL-6100WL */
 				ds.x = hidData[2] << 8;
 				ds.x |= hidData[1];
 				ds.y = hidData[5] << 8;
 				ds.y |= hidData[4];
 				ds.buttons = hidData[0] & 0x07;
-				ds.pressure = (hidData[8] ) << 8;
+				ds.pressure = hidData[8] << 8;
 				ds.pressure |= hidData[7];
 				ds.distance = hidData[15];
-//				if (ds.distance > 24)
+				if ( ds.distance < 50 )
 					ds.proximity = 1;
-//				else
-//					ds.proximity = 0;
+				else {
+					ds.proximity = 0;
+				}
+				if (ds.pressure < 64 ) {
+					ds.buttons &= 0x6;
+					ds.pressure = 0;
+				}
 				invert = 0;
 				ds.xTilt = -1;
 				ds.yTilt = -1;
@@ -487,7 +493,6 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 
 		if (!ds.proximity)
 			UsbTabletOutOfProx(comm->currentProxDev, comm->nAxes);
-
 		for (i = 0; i < comm->nDevs; i++) {
 			DBG(7, ErrorF("UsbTabletReadInput sending to %s\n",
 				      comm->devices[i]->name));
@@ -836,6 +841,18 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->distanceMax = 63;
 			comm->nAxes = 3;
 			break;
+		case 0x0374: /* Intuos S CTL-4100 */
+		case 0x0376: /* Intuos BT S CTL-4100WL */
+			comm->xMin = 0;
+			comm->xMax = 15200;
+			comm->yMin = 0;
+			comm->yMax = 9500;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 4095;
+			comm->distanceMin = 0;
+			comm->distanceMax = 63;
+			comm->nAxes = 3;
+			break;
 		case 0x0378: /* Intuos BT M CTL-6100WL */
 			comm->xMin = 0;
 			comm->xMax = 21600;
@@ -848,7 +865,7 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->nAxes = 3;
 			break;
 		default:
-	DBG(1, ErrorF("not match\n"));
+			DBG(1, ErrorF("not match\n"));
 			return !Success;
 		}
 	} else {
