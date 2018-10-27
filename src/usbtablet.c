@@ -54,6 +54,7 @@
 #include <dev/usb/usbhid.h>
 
 #include <xorg-server.h>
+#include <xorg/xserver-properties.h>
 #include <misc.h>
 #include <xf86.h>
 #include <xf86_OSproc.h>
@@ -253,6 +254,9 @@ UsbTabletProc(DeviceIntPtr pUSBT, int what)
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 	Atom btn_labels[NBUTTONS] = {0};
 	Atom axes_labels[NAXES] = {0};
+	axes_labels[0] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_X);
+	axes_labels[1] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_Y);
+	axes_labels[2] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_PRESSURE);
 #endif
 
 	switch (what) {
@@ -906,6 +910,9 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 	double factorX,factorY;
 #if GET_ABI_MAJOR(ABI_XINPUT_VERSION) >= 7
 	Atom axes_labels[NAXES] = {0};
+	axes_labels[0] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_X);
+	axes_labels[1] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_Y);
+	axes_labels[2] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_PRESSURE);
 #endif
 	DBG(1, ErrorF("UsbTabletOpenDevice start\n"));
 	if (pInfo->fd < 0) {
