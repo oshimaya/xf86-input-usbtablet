@@ -162,7 +162,7 @@ static void UsbTabletReadInput(InputInfoPtr);
 static void UsbTabletClose(InputInfoPtr);
 static int UsbTabletOpenDevice(DeviceIntPtr);
 static void UsbTabletSendEvents(InputInfoPtr, int, USBTState *, int);
-static void UsbTabletSendButtons(InputInfoPtr, int, int, int, int, int, int);
+static void UsbTabletSendButtons(InputInfoPtr, int,int, int, int, int, int, int);
 static void UsbTabletOutOfProx(USBTDevicePtr prx, int);
 static void UsbTabletIntoProx(USBTDevicePtr prx, USBTState *ds, int);
 
@@ -180,6 +180,7 @@ static XF86ModuleVersionInfo VersionRec = {
 	MOD_CLASS_XINPUT,
 	{0, 0, 0, 0}		/* signature to be patched into the file */
 };
+
 
 _X_EXPORT XF86ModuleData usbtabletModuleData = {&VersionRec,
 				      SetupProc, TearDownProc };
@@ -257,6 +258,11 @@ UsbTabletProc(DeviceIntPtr pUSBT, int what)
 	axes_labels[0] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_X);
 	axes_labels[1] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_Y);
 	axes_labels[2] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_PRESSURE);
+	axes_labels[3] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_TILT_X);
+	axes_labels[4] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_TILT_Y);
+	btn_labels[0] = XIGetKnownProperty(BTN_LABEL_PROP_BTN_LEFT);
+	btn_labels[1] = XIGetKnownProperty(BTN_LABEL_PROP_BTN_MIDDLE);
+	btn_labels[2] = XIGetKnownProperty(BTN_LABEL_PROP_BTN_RIGHT);
 #endif
 
 	switch (what) {
@@ -352,7 +358,7 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 	int		invert, len, i;
 	unsigned char	buffer[200], *p;
 	USBTState	ds;
-	uint8_t hidData[NPKT];
+	volatile uint8_t hidData[NPKT];
 
 	DBG(7, ErrorF("UsbTabletReadInput BEGIN device=%s fd=%d\n",
 		      comm->devName, pInfo->fd));
@@ -376,6 +382,11 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 //			hidData[i] = hid_get_data(p, &comm->hidData[i]) & 0xff;
 			hidData[i] = *(p+i);
 		}
+/*
+		for (i=0;i<15;i++)
+			printf("%2.2x ",hidData[i]);
+		printf("\n");
+*/
 
 		if (comm->idVendor == 0x056a) {
 		/* Wacom */
@@ -398,6 +409,21 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 				ds.xTilt = -1;
 				ds.yTilt = -1;
 				break;
+			case 0x50a2: /* Dynabook V */
+				ds.x = hidData[2] << 8;
+				ds.x |= hidData[1];
+				ds.y = hidData[4] << 8;
+				ds.y |= hidData[3];
+				ds.buttons = hidData[0] & 0x03;
+				ds.buttons |= (hidData[0] & 0x08)>>1;
+				ds.buttons |= (hidData[0] & 0x04)>>2;
+				ds.pressure = (hidData[6] ) << 8 ;
+				ds.pressure |= hidData[5];
+				invert = 0;
+				ds.proximity = (hidData[0] >> 5) & 0x01;
+				ds.xTilt = -1;
+				ds.yTilt = -1;
+				break;
 			case 0x00dd: /* Bamboo Pen CTL-470/K */
 			case 0x00df: /* Bamboo Pen and Touch CTH-670/K */
 			case 0x0302: /* Intuos PTS CTH-480 */
@@ -417,6 +443,40 @@ UsbTabletReadInput(InputInfoPtr pInfo)
 					ds.proximity = 0;
 				ds.xTilt = -1;
 				ds.yTilt = -1;
+				break;
+			case 0x0021: /* Intuos GD-0608-U */
+				ds.x = hidData[1] << 8;
+				ds.x |= hidData[2];
+				ds.y = hidData[3] << 8;
+				ds.y |= hidData[4];
+				ds.distance = hidData[8] >> 3;
+				if (ds.distance < 20)
+					ds.proximity = 1;
+				else
+					ds.proximity = 0;
+				ds.buttons = hidData[0] & 0x07;
+				/*
+				  XXX:
+				  Cannot find erase flag in my intuos stylus
+				  invert = (hidData[0] >> 5) & 0x01;
+				 */
+				invert = 0;
+				ds.pressure = hidData[5] << 2;
+				ds.pressure |= (hidData[6] & 0xc0) >> 6;
+				/*
+                                 XXX: My stylus pen does not return pen touch status as 1st button.
+				      So, set 1st button when presure is bigger than 128.
+				*/
+				if (ds.pressure > 128 ) 
+					ds.buttons |= 1;
+				ds.xTilt = (hidData[6] << 1) & 0x7f;
+				ds.xTilt |= hidData[7] >> 7;
+				ds.xTilt -= 64;
+				if (ds.xTilt == 0)
+					ds.xTilt = 1;
+				ds.yTilt = (hidData[7] & 0x7f) - 64;
+				if (ds.yTilt == 0)
+					ds.yTilt = 1;
 				break;
 			case 0x0043: /* Intuos2 A4 XD-0912-U */
 				ds.x = hidData[1] << 8;
@@ -525,7 +585,7 @@ UsbTabletOutOfProx(USBTDevicePtr prx, int nAxes)
 	if (prx->state.buttons) {
 		/* Report buttons up when the device goes out of proximity. */
 		DBG(9, ErrorF("xf86USBTOutOfProx: reset buttons\n"));
-		UsbTabletSendButtons(prx->info, 0,
+		UsbTabletSendButtons(prx->info, 0, nAxes,
 				   ods->x, ods->y, ods->pressure,
 				   ods->xTilt, ods->yTilt);
 		prx->state.buttons = 0;
@@ -575,7 +635,7 @@ UsbTabletIntoProx(USBTDevicePtr prx, USBTState *ds, int nAxes)
 }
 
 static void
-UsbTabletSendButtons(InputInfoPtr pInfo, int buttons,
+UsbTabletSendButtons(InputInfoPtr pInfo, int buttons, int nAxes,
 		     int rx, int ry, int rz,
 		     int rtx, int rty)
 {
@@ -588,10 +648,29 @@ UsbTabletSendButtons(InputInfoPtr pInfo, int buttons,
 		if ((mask & priv->state.buttons) != (mask & buttons)) {
 			DBG(4, ErrorF("UsbTabletSendButtons button=%d is %d\n",
 				      button, (buttons & mask) != 0));
+
 			xf86PostButtonEvent(pInfo->dev,
 					    (priv->flags & ABSOLUTE_FLAG),
 					    button, (buttons & mask) != 0,
+					    0, 0);
+/*
+			switch (nAxes) {
+			case 3:
+				xf86PostButtonEvent(pInfo->dev,
+					    (priv->flags & ABSOLUTE_FLAG),
+					    button, (buttons & mask) != 0,
+					    0, 3, rx, ry, rz);
+				break;
+			case 5:
+				xf86PostButtonEvent(pInfo->dev,
+					    (priv->flags & ABSOLUTE_FLAG),
+					    button, (buttons & mask) != 0,
 					    0, 5, rx, ry, rz, rtx, rty);
+				break;
+			default:
+				break;
+			}
+*/
 		}
 	}
 }
@@ -651,7 +730,7 @@ UsbTabletSendEvents(InputInfoPtr pInfo, int invert, USBTState *ds, int nAxes)
 		}
 	}
 	if (ds->buttons != ods->buttons)
-		UsbTabletSendButtons(pInfo, ds->buttons,
+		UsbTabletSendButtons(pInfo, ds->buttons, nAxes,
 				   rx - comm->offsetX, ry - comm->offsetY, rz, rtx, rty);
 	*ods = *ds;
 }
@@ -779,6 +858,17 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->tipPressureMax = 511;
 			comm->nAxes = 3;
 			break;
+		case 0x0021: /* Intuos GD-0608-U */
+			comm->xMin = 0;
+			comm->xMax = 20320;
+			comm->yMin = 0;
+			comm->yMax = 16240;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 1023;
+			comm->distanceMin = 0;
+			comm->distanceMax = 31;
+			comm->nAxes = 5;
+			break;
 		case 0x0043: /* Intuos2 A4 XD-0912-U */
 			comm->xMin = 0;
 			comm->xMax = 30480;
@@ -868,6 +958,15 @@ UsbTabletOpen(InputInfoPtr pInfo)
 			comm->distanceMax = 63;
 			comm->nAxes = 3;
 			break;
+		case 0x50a2: /* Dynabook V */
+			comm->xMin = 0;
+			comm->xMax = 27650;
+			comm->yMin = 0;
+			comm->yMax = 15560;
+			comm->tipPressureMin = 0;
+			comm->tipPressureMax = 2047;
+			comm->nAxes = 3;
+			break;
 		default:
 			DBG(1, ErrorF("not match\n"));
 			return !Success;
@@ -913,6 +1012,8 @@ UsbTabletOpenDevice(DeviceIntPtr pUSBT)
 	axes_labels[0] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_X);
 	axes_labels[1] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_Y);
 	axes_labels[2] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_PRESSURE);
+	axes_labels[3] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_TILT_X);
+	axes_labels[4] = XIGetKnownProperty(AXIS_LABEL_PROP_ABS_TILT_Y);
 #endif
 	DBG(1, ErrorF("UsbTabletOpenDevice start\n"));
 	if (pInfo->fd < 0) {
